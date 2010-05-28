@@ -4,8 +4,6 @@ import xml.dom.minidom
 
 __author__ = 'David Lynch (kemayo at gmail dot com)'
 __version__ = '1'
-__revision__ = '$Rev: 75 $'
-__date__ = '$Date: 2007-11-01 12:15:12 -0700 (Thu, 01 Nov 2007) $'
 __copyright__ = 'Copyright (c) 2008 David Lynch'
 __license__ = 'New BSD License'
 
@@ -33,6 +31,7 @@ class Character(object):
     def __init__(self, dom):
         self.name = dom.getAttribute('name')
         self.character_class = dom.getAttribute('class')
+        self.class_id = dom.getAttribute('classId')
         self.level = dom.getAttribute('level') and int(dom.getAttribute('level')) or 0
         self.race = dom.getAttribute('race')
         self.gender = dom.getAttribute('gender')
@@ -71,7 +70,7 @@ class DetailedCharacter(Character):
         details = dom.getElementsByTagName('characterTab')
         if details:
             # Check this because an armory cache miss will result in very minimal info
-            # TODO: buffs, professions, title, knownTitles
+            # TODO: buffs, professions, title, knownTitles, talentSpecs, achievement summary
             details = details[0]
             self.bars = _simple_stat_extract(details, 'characterBars')
 
@@ -94,12 +93,13 @@ class DetailedCharacter(Character):
             self.spell['penetration'] = _attributes(spell.getElementsByTagName('penetration')[0])
             self.spell['mana_regen'] = _attributes(spell.getElementsByTagName('manaRegen')[0])
             
-            self.items = [Item(item) for item in dom.getElementsByTagName('item')]
+            self.items = [EquippedItem(item) for item in dom.getElementsByTagName('item')]
+            self.glyphs = [Glyph(glyph) for glyph in dom.getElementsByTagName('glyph')]
 
             self.pvp = _simple_stat_extract(details, 'pvp')
 
 class GuildCharacter(Character):
-    """Characters as portrayed on the character sheet"""
+    """Characters as portrayed on the guild roster sheet"""
     def __init__(self, dom):
         Character.__init__(self, dom)
         key = dom.parentNode.parentNode.parentNode.getElementsByTagName('guildKey')[0]
@@ -168,13 +168,14 @@ class Item(object):
         return "item:%d" % self.id
 
 class EquippedItem(Item):
-    """The basic item information available on a character page.
-    
-    Notably, this does not include the name of the item."""
+    """The basic item information available on a character page."""
     def __init__(self, dom):
+        # todo: work out what displayInfoId refers to, and if it should be included
         self.id = int(dom.getAttribute('id'))
+        self.name = dom.getAttribute('name')
         self.slot = int(dom.getAttribute('slot'))
-        self.icon = dom.getAttribute('icon')
+        self.icon = dom.getAttribute('icon') # a texture name like "inv_chest_plate_25"
+        self.rarity = int(dom.getAttribute('rarity'))
         self.enchant = int(dom.getAttribute('permanentenchant')) # An id; can probably be mined futher from wowhead
         self.seed = int(dom.getAttribute('seed')) # I'm not actually sure what this *is*.
         self.random_properties = int(dom.getAttribute('randomPropertiesId')) # Again, not 100% sure.
@@ -194,6 +195,20 @@ class DetailedItem(Item):
         self.item_class = (_getNodeTextByTag(dom, 'classId'), _getNodeTextByTag(dom, 'subclassName')) # e.g (4, 'Plate')
 
         #self.drop_rate = _getNodeTextByTag(dom, 
+
+class Glyph(object):
+    def __init__(self, dom):
+        self.id = int(dom.getAttribute('id'))
+        self.name = dom.getAttribute('name')
+        self.icon = dom.getAttribute('icon')
+        self.type = dom.getAttribute('type')
+        self.effect = dom.getAttribute('effect')
+    def __eq__(self, other):
+        if not hasattr(other, 'id'):
+            return False
+        return self.id == other.id
+    def __str__(self):
+        return "glyph:%d" % self.id
 
 class ArmoryException(Exception):
     pass
@@ -270,5 +285,5 @@ def get_item(itemid):
     #return itemTooltips[0]
 
 if __name__ == "__main__":
-    a = get_character('us', 'Lothar', 'Iniquitous')
+    a = get_character('us', 'Lothar', 'Retcon')
     print a
